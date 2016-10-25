@@ -1,9 +1,11 @@
 package report
 
 import (
+	"crypto/x509"
 	"encoding/json"
 	"github.com/s-rah/onionscan/utils"
 	"io/ioutil"
+	"time"
 )
 
 type ExifTag struct {
@@ -16,35 +18,70 @@ type ExifImage struct {
 	ExifTags []ExifTag `json:"exifTags"`
 }
 
+type PGPKey struct {
+	ArmoredKey  string `json:"armoredKey"`
+	Identity    string `json:"identity"`
+	FingerPrint string `json:"fingerprint"`
+}
+
 type OnionScanReport struct {
-	WebDetected      bool `json:"webDetected"`
-	SSHDetected      bool `json:"sshDetected"`
-	RicochetDetected bool `json:"ricochetDetected"`
-	IRCDetected      bool `json:"ircDetected"`
-	FTPDetected      bool `json:"ftpDetected"`
-	SMTPDetected     bool `json:"smtpDetected"`
+	HiddenService string    `json:"hiddenService"`
+	DateScanned   time.Time `json:"dateScanned"`
 
-	BitcoinDetected bool `json:"bitcoinDetected"`
+	// Summary
+	WebDetected        bool `json:"webDetected"`
+	TLSDetected        bool `json:"tlsDetected"`
+	SSHDetected        bool `json:"sshDetected"`
+	RicochetDetected   bool `json:"ricochetDetected"`
+	IRCDetected        bool `json:"ircDetected"`
+	FTPDetected        bool `json:"ftpDetected"`
+	SMTPDetected       bool `json:"smtpDetected"`
+	BitcoinDetected    bool `json:"bitcoinDetected"`
+	MongoDBDetected    bool `json:"mongodbDetected"`
+	VNCDetected        bool `json:"vncDetected"`
+	XMPPDetected       bool `json:"xmppDetected"`
+	SkynetDetected     bool `json:"skynetDetected"`
+	PrivateKeyDetected bool `json:"privateKeyDetected"`
 
-	HiddenService             string      `json:"hiddenService"`
-	ServerPoweredBy           string      `json:"serverPoweredBy"`
-	ServerVersion             string      `json:"serverVersion"`
-	FoundApacheModStatus      bool        `json:"foundApacheModStatus"`
-	RelatedOnionServices      []string    `json:"relatedOnionServices"`
-	RelatedClearnetDomains    []string    `json:"relatedOnionDomains"`
-	LinkedSites               []string    `json:"linkedSites"`
-	IP                        []string    `json:"ipAddresses"`
-	OpenDirectories           []string    `json:"openDirectories"`
-	ExifImages                []ExifImage `json:"exifImages"`
-	InterestingFiles          []string    `json:"interestingFiles"`
-	PageReferencedDirectories []string    `json:"pageReferencedDirectories"`
-	PGPKeys                   []string    `json:"pgpKeys"`
+	// Web Specific
+	ServerPoweredBy           string            `json:"serverPoweredBy"`
+	ServerVersion             string            `json:"serverVersion"`
+	FoundApacheModStatus      bool              `json:"foundApacheModStatus"`
+	RelatedOnionServices      []string          `json:"relatedOnionServices"`
+	RelatedClearnetDomains    []string          `json:"relatedOnionDomains"`
+	LinkedSites               []string          `json:"linkedSites"`
+	InternalPages             []string          `json:"internalPages"`
+	IP                        []string          `json:"ipAddresses"`
+	OpenDirectories           []string          `json:"openDirectories"`
+	ExifImages                []ExifImage       `json:"exifImages"`
+	InterestingFiles          []string          `json:"interestingFiles"`
+	PageReferencedDirectories []string          `json:"pageReferencedDirectories"`
+	PGPKeys                   []PGPKey          `json:"pgpKeys"`
+	Hashes                    []string          `json:"hashes"`
+	Snapshot                  string            `json:"snapshot"`
+	PageTitle                 string            `json:"pageTitle"`
+	ResponseHeaders           map[string]string `json:"responseHeaders"`
 
-	Hashes          []string          `json:"hashes"`
-	SSHKey          string            `json:"sshKey"`
-	Snapshot        string            `json:"snapshot"`
-	PageTitle       string            `json:"pageTitle"`
-	ResponseHeaders map[string]string `json:"responseHeaders"`
+	// TLS
+	Certificates []x509.Certificate `json:"certificates"`
+
+	//Bitcoin
+	BitcoinAddresses []string `json:"bitcoinAddresses"`
+
+	// SSH
+	SSHKey    string `json:"sshKey"`
+	SSHBanner string `json:"sshBanner"`
+
+	// FTP
+	FTPFingerprint string `json:"ftpFingerprint"`
+	FTPBanner      string `json:"ftpBanner"`
+
+	// SMTP
+	SMTPFingerprint string `json:"smtpFingerprint"`
+	SMTPBanner      string `json:"smtpBanner"`
+
+	NextAction string `json:"lastAction"`
+	TimedOut   bool
 }
 
 func LoadReportFromFile(filename string) (OnionScanReport, error) {
@@ -58,7 +95,11 @@ func LoadReportFromFile(filename string) (OnionScanReport, error) {
 }
 
 func NewOnionScanReport(hiddenService string) *OnionScanReport {
-	return &OnionScanReport{HiddenService: hiddenService, ResponseHeaders: make(map[string]string)}
+	report := new(OnionScanReport)
+	report.HiddenService = hiddenService
+	report.ResponseHeaders = make(map[string]string)
+	report.DateScanned = time.Now()
+	return report
 }
 
 func (osr *OnionScanReport) AddOpenDirectory(dir string) {
@@ -86,9 +127,14 @@ func (osr *OnionScanReport) AddLinkedSite(site string) {
 	utils.RemoveDuplicates(&osr.LinkedSites)
 }
 
-func (osr *OnionScanReport) AddPGPKey(key string) {
-	osr.PGPKeys = append(osr.PGPKeys, key)
-	utils.RemoveDuplicates(&osr.PGPKeys)
+func (osr *OnionScanReport) AddInternalPage(site string) {
+	osr.InternalPages = append(osr.InternalPages, site)
+	utils.RemoveDuplicates(&osr.InternalPages)
+}
+
+func (osr *OnionScanReport) AddPGPKey(armoredKey, identity, fingerprint string) {
+	osr.PGPKeys = append(osr.PGPKeys, PGPKey{armoredKey, identity, fingerprint})
+	//TODO map of fingerprint:PGPKeys? and  utils.RemoveDuplicates(&osr.PGPKeys)
 }
 
 func (osr *OnionScanReport) AddResponseHeader(name string, value string) {
